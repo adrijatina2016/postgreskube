@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-script
+data:
+  script.sh: |
+    #!/bin/sh
+    touch a1.txt
+    POD_NAME="$POD_NAME"
+    if [ "$POD_NAME" = "postgresdb-stateful-0" ]; then
+      touch abc.txt
+    else
+      touch xyz.txt
+    fi

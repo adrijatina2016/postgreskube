@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresdb-stateful
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgresdb-stateful
+  template:
+    metadata:
+      labels:
+        app: postgresdb-stateful
+    spec:
+      containers:
+        - name: postgresdb-learn
+          image: postgreskube2:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POSTGRES_DB
+              value: testDB
+            - name: POSTGRES_USER
+              value: testUser
+            - name: POSTGRES_PASSWORD
+              value: testPassword
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-volume
+                #- mountPath: /var/lib/postgresql
+                #name: script-volume
+                #volumes:
+                #- name: script-volume
+                #configMap:
+                #name: custom-script
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-volume
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: demo-storage
+        resources:
+          requests:
+            storage: 1Gi
