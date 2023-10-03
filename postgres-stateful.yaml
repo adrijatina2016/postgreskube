@@ -3,6 +3,7 @@ kind: StatefulSet
 metadata:
   name: postgresdb-stateful
 spec:
+  serviceName: postgres-headless-svc
   replicas: 2
   selector:
     matchLabels:
@@ -12,9 +13,28 @@ spec:
       labels:
         app: postgresdb-stateful
     spec:
+      initContainers:
+        - name: init-resolve-ip
+          image: busybox
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Resolve the IP address of postgresdb-stateful-0 and store it in an environment variable
+              #if["$POD_NAME" == "postgresdb-stateful-0"];then
+              export PEER_POD_IP=$(nslookup postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+              #elif["$POD_NAME" == "postgresdb-stateful-1"];then
+              #export SECONDARY_PEER_POD_IP=$(nslookup postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+              #fi
+              echo "Peer IP address: $PEER_POD_IP"
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
       containers:
         - name: postgresdb-learn
-          image: postgreskube2:latest
+          image: mypostgreskube:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
@@ -29,21 +49,21 @@ spec:
               value: testUser
             - name: POSTGRES_PASSWORD
               value: testPassword
+            - name: PEER_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: postgres-volume
-                #- mountPath: /var/lib/postgresql
-                #name: script-volume
-                #volumes:
-                #- name: script-volume
-                #configMap:
-                #name: custom-script
   volumeClaimTemplates:
     - metadata:
         name: postgres-volume
       spec:
-        accessModes: ["ReadWriteOnce"]
+        accessModes:
+          - ReadWriteOnce
         storageClassName: demo-storage
         resources:
           requests:
             storage: 1Gi
+

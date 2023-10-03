@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Check if this is the primary node or standby node
+
 if [ "$POD_NAME" == "postgresdb-stateful-0" ]; then
     echo "Within primary node *****************"
 
@@ -56,25 +57,42 @@ echo "$POSTGRE_SQL_CONF_CONTENTS" > /var/lib/pgsql/15/data/postgresql.conf
     sleep 5
 
     # Modify repmgr.conf and start repmgr
-    sed -i "s/\$REPMGR_DB_HOST/$REPMGR_DB_HOST/g" /repmgr.conf
+    #sed -i "s/\$REPMGR_DB_HOST/$REPMGR_DB_HOST/g" /repmgr.conf
    # /repmgr start
 
     # Create necessary PostgreSQL users and databases
     su -l postgres -c "psql -c 'CREATE USER repmgr WITH PASSWORD '\''repmgr'\'';'"
     su -l postgres -c "psql -c 'CREATE DATABASE repmgrdb;'"
     su -l postgres -c "psql -c 'GRANT ALL PRIVILEGES ON DATABASE repmgrdb TO repmgr;'"
+    ip_address=$PEER_POD_IP
+    sed -i "s/REPMGR_DB_HOST/$ip_address/g" /repmgr.conf
     tail -f /dev/null
  elif [ "$POD_NAME" == "postgresdb-stateful-1" ]; then
          new_node_name=standby
          new_node_id=2
+         node_ip=postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local
+         #primary_pod_ip=nslookup postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local
+         result=$(nslookup postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+         primary_pod_ip=$(echo "$result" | awk 'END {print}')
 
+         #echo "$primary_pod_ip"
+         echo "$primary_pod_ip"
          echo "Within secondary node *****************"
-         echo "$old_node_name"
+         #dns_name="postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local"
+         ip_address=$PEER_POD_IP
+         echo "ip address resolved"
+         echo "$ip_address"
+         if [ -n "$ip_address" ]; then
+                 echo "The IP address of $dns_name is $ip_address"
+         fi
+         echo "Node name replaced *******************"
          sed -i "s/^node_name=primary/node_name=$new_node_name/" /repmgr.conf
+         echo "Node id replacing ***************************"
          sed -i "s/^node_id=1/node_id=$new_node_id/" /repmgr.conf
-         sed -i "s/^REPMGR_DB_HOST/postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local/" /repmgr.conf
+         echo "$node_ip"
+         sed -i "s/REPMGR_DB_HOST/$ip_address/g" /repmgr.conf
 
-
+         echo "Cloning start ******************************"
          su -l postgres -c "/usr/pgsql-15/bin/repmgr -h postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local -U repmgr -f /repmgr.conf standby clone"
          su -l postgres -c "/usr/pgsql-15/bin/pg_ctl -D /var/lib/pgsql/15/data -l /tmp/pg_logfile start"
     # Tail the log to keep the container running
