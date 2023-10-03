@@ -65,7 +65,16 @@ echo "$POSTGRE_SQL_CONF_CONTENTS" > /var/lib/pgsql/15/data/postgresql.conf
     su -l postgres -c "psql -c 'GRANT ALL PRIVILEGES ON DATABASE repmgrdb TO repmgr;'"
     tail -f /dev/null
  elif [ "$POD_NAME" == "postgresdb-stateful-1" ]; then
+         new_node_name=standby
+         new_node_id=2
+
          echo "Within secondary node *****************"
+         echo "$old_node_name"
+         sed -i "s/^node_name=primary/node_name=$new_node_name/" /repmgr.conf
+         sed -i "s/^node_id=1/node_id=$new_node_id/" /repmgr.conf
+         sed -i "s/^REPMGR_DB_HOST/postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local/" /repmgr.conf
+
+
          su -l postgres -c "/usr/pgsql-15/bin/repmgr -h postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local -U repmgr -f /repmgr.conf standby clone"
          su -l postgres -c "/usr/pgsql-15/bin/pg_ctl -D /var/lib/pgsql/15/data -l /tmp/pg_logfile start"
     # Tail the log to keep the container running

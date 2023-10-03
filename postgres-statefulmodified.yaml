@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresdb-stateful
+spec:
+  serviceName: postgres-headless-svc
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgresdb-stateful
+  template:
+    metadata:
+      labels:
+        app: postgresdb-stateful
+    spec:
+      containers:
+        - name: postgresdb-learn
+          lifecycle:
+            postStart:
+              exec:
+                #command: ["/bin/sh", "-c", "echo $POD_NAME > /usr/share/message"]
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    if [ "$POD_NAME" == "postgresdb-stateful-0" ]; then
+                      result=$(nslookup postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local)
+                      echo "$result" > /usr/share/message
+                    else
+                      result=$(nslookup postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local)
+                      echo "$result" > /usr/share/output
+                    fi
+          image: mypostgreskube:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POSTGRES_DB
+              value: testDB
+            - name: POSTGRES_USER
+              value: testUser
+            - name: POSTGRES_PASSWORD
+              value: testPassword
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-volume
+                #- mountPath: /var/lib/postgresql
+                #name: script-volume
+                #volumes:
+                #- name: script-volume
+                #configMap:
+                #name: custom-script
+
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-volume
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: demo-storage
+        resources:
+          requests:
+            storage: 1Gi

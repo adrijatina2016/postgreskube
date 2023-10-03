@@ -19,14 +19,8 @@ RUN chgrp postgres /repmgr.conf
 RUN chmod 777 /repmgr.conf
 
 ENV POD_NAME=podName
-#ENV REPMGR_NODE_NAME=abc
-#ENV REPMGR_NODE_NETWORK_NAME=172.17.0.2
-#ENV REPMGR_NODE_PRIORITY=100
-#ENV REPMGR_PRIMARY_HOST=
-#ENV REPMGR_PRIMARY_PORT=5432
-#ENV REPMGR_PASSWORD=your_replication_password
-#ENV REPMGR_CONNECT_TIMEOUT=2
-#ENV REPMGR_RECONNECT_ATTEMPTS=6
+ENV NODE_ID=1
+ENV NODE_NAME=primary
 
 
 COPY custom-entrypoint-1.sh /usr/local/bin/custom-entrypoint-1.sh
