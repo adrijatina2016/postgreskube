@@ -13,25 +13,6 @@ spec:
       labels:
         app: postgresdb-stateful
     spec:
-      initContainers:
-        - name: init-resolve-ip
-          image: busybox
-          command:
-            - /bin/sh
-            - -c
-            - |
-              # Resolve the IP address of postgresdb-stateful-0 and store it in an environment variable
-              #if["$POD_NAME" == "postgresdb-stateful-0"];then
-              export PEER_POD_IP=$(nslookup postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
-              #elif["$POD_NAME" == "postgresdb-stateful-1"];then
-              #export SECONDARY_PEER_POD_IP=$(nslookup postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
-              #fi
-              echo "Peer IP address: $PEER_POD_IP"
-          env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
       containers:
         - name: postgresdb-learn
           image: mypostgreskube:latest
@@ -49,6 +30,8 @@ spec:
               value: testUser
             - name: POSTGRES_PASSWORD
               value: testPassword
+            - name: PRIMARY_POD_IP
+              value:
             - name: PEER_POD_IP
               valueFrom:
                 fieldRef:
@@ -66,4 +49,3 @@ spec:
         resources:
           requests:
             storage: 1Gi
-
