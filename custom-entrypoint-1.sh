@@ -9,8 +9,9 @@ last_part="${arrIN[-1]}"
 echo "************** POD IDENTIFICATION ID: $last_part *****************************"
 
 if [ "$last_part" -gt 0 ]; then
-        new_node_name=standby
-        new_node_id=$last_part
+        if [[ $last_part =~ ^[0-9]+$ ]]; then
+        new_node_name="standby-$last_part"
+        new_node_id=$((last_part + 1))
         #node_ip=postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local
 
         result=$(nslookup postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
@@ -43,6 +44,7 @@ if [ "$last_part" -gt 0 ]; then
         #echo "server started**** now registering the server to cluster"
         su -l postgres -c "/usr/pgsql-15/bin/repmgr -f /var/lib/pgsql/repmgr.conf standby register"
     tail -f /dev/null
+        fi
 
 
 else
@@ -66,4 +68,3 @@ else
         su -l postgres -c "/usr/pgsql-15/bin/repmgr -f /var/lib/pgsql/repmgr.conf primary register"
         tail -f /dev/null
 fi
-
