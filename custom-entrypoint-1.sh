@@ -9,45 +9,45 @@ last_part="${arrIN[-1]}"
 echo "************** POD IDENTIFICATION ID: $last_part *****************************"
 
 if [ "$last_part" -gt 0 ]; then
-        if [[ $last_part =~ ^[0-9]+$ ]]; then
-        new_node_name="standby-$last_part"
-        new_node_id=$((last_part + 1))
-        #node_ip=postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local
+    if [[ $last_part =~ ^[0-9]+$ ]]; then
+    new_node_name="standby-$last_part"
+    new_node_id=$((last_part + 1))
 
-        result=$(nslookup postgresdb-stateful-0.postgres-headless-svc.default.svc.cluster.local | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
-        primary_pod_ip=$(echo "$result" | awk 'END {print}')
+    su -l postgres -c "cp /repmgr.conf /var/lib/pgsql"
+    su -l postgres -c "sed -i "s/^node_name=primary/node_name=$new_node_name/" /var/lib/pgsql/repmgr.conf"
+    su -l postgres -c "sed -i "s/^node_id=1/node_id=$new_node_id/" /var/lib/pgsql/repmgr.conf"
+    su -l postgres -c "sed -i "s/REPMGR_DB_HOST/$PEER_POD_IP/g" /var/lib/pgsql/repmgr.conf"
 
-        #echo "$primary_pod_ip"
-        #echo "$primary_pod_ip"
-        echo "Within secondary node *****************"
-        #dns_name="postgresdb-stateful-1.postgres-headless-svc.default.svc.cluster.local"
-        ip_address=$PEER_POD_IP
-        #echo "ip address resolved"
-        #echo "$ip_address"
-        if [ -n "$ip_address" ]; then
-                 echo "The IP address of $dns_name is $ip_address"
-        fi
-        #echo "Node name replaced *******************"
-        su -l postgres -c "cp /repmgr.conf /var/lib/pgsql"
-        su -l postgres -c "sed -i "s/^node_name=primary/node_name=$new_node_name/" /var/lib/pgsql/repmgr.conf"
-        #echo "Node id replacing ***************************"
-        su -l postgres -c "sed -i "s/^node_id=1/node_id=$new_node_id/" /var/lib/pgsql/repmgr.conf"
-        #echo "$node_ip"
-        su -l postgres -c "sed -i "s/REPMGR_DB_HOST/$ip_address/g" /var/lib/pgsql/repmgr.conf"
-        sleep 10
-        #echo "Cloning start ******************************"
-        su -l postgres -c "/usr/pgsql-15/bin/repmgr -h $primary_pod_ip -U repmgr -f /var/lib/pgsql/repmgr.conf standby clone --dry-run"
-        sleep 20
-        su -l postgres -c "/usr/pgsql-15/bin/repmgr -h $primary_pod_ip -U repmgr -f /var/lib/pgsql/repmgr.conf standby clone"
-        #echo "Cloning done....Now starting the server ********"
-        su -l postgres -c "/usr/pgsql-15/bin/pg_ctl -D /var/lib/pgsql/15/data -l /tmp/pg_logfile start"
-        #echo "server started**** now registering the server to cluster"
-        su -l postgres -c "/usr/pgsql-15/bin/repmgr -f /var/lib/pgsql/repmgr.conf standby register"
+    upstream="postgresdb-stateful-$((last_part - 1)).postgres-headless-svc.default.svc.cluster.local"
+    echo "the upstream url ==> $upstream"
+    result=$(nslookup "$upstream" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+
+    echo "the result for nslookup $result"
+    upstream_pod_ip=$(echo "$result" | awk 'END {print}')
+    echo "he upstream pod ip ==> $upstream_pod_ip"
+    sleep 10
+    su -l postgres -c "/usr/pgsql-15/bin/repmgr -h $upstream_pod_ip -U repmgr -f /var/lib/pgsql/repmgr.conf standby clone --dry-run" &
+    bg_command_pid=$!
+    #echo "And the wait begins*******************"
+    wait $bg_command_pid
+    echo "The wait ends **************************"
+
+    su -l postgres -c "/usr/pgsql-15/bin/repmgr -h $upstream_pod_ip -U repmgr -f /var/lib/pgsql/repmgr.conf standby clone" &
+    clone_command_pid=$!
+
+    wait $clone_command_pid
+
+    su -l postgres -c "/usr/pgsql-15/bin/pg_ctl -D /var/lib/pgsql/15/data -l /tmp/pg_logfile start"
+
+    su -l postgres -c "/usr/pgsql-15/bin/repmgr -f /var/lib/pgsql/repmgr.conf standby register"
+
+
     tail -f /dev/null
-        fi
+fi
 
 
-else
+
+ else
          echo "Within primary node *****************"
 
         su -l postgres -c "/usr/pgsql-15/bin/initdb"
