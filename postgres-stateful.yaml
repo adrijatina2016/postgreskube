@@ -25,7 +25,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: POSTGRES_DB
-              value: testDB
+              value: testdb
             - name: POSTGRES_USER
               value: testUser
             - name: POSTGRES_PASSWORD
